@@ -1,9 +1,9 @@
 #include "Sphere.h"
 #include "HittableList.h"
-#include "Vec3.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #include <cfloat>
+#include <ctime>
 #include "Camera.h"
 #include "Material.h"
 
@@ -60,11 +60,12 @@ Hittable *random_scene() {
 }
 
 int main() {
-    int nx = 1000;
-    int ny = 500;
-    int ns = 10;
+    std::clock_t start = std::clock();
+    const int nx = 1000;
+    const int ny = 500;
+    const int ns = 10;
     unsigned char image[nx * ny * 3]; // RGB image
-    int index = 0;
+	int index = 0;
     Vec3 lookfrom(13, 2, 3);
     Vec3 lookat(0, 0, 0);
 
@@ -90,15 +91,18 @@ int main() {
                 col += color(r, world, 0);
             }
             col /= float(ns);
-            col = Vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
+            col = Vec3(sqrt(col.x()), sqrt(col.y()), sqrt(col.z()));
 
-            int ir = int(255.99*col[0]);
-            int ig = int(255.99*col[1]);
-            int ib = int(255.99*col[2]);
+            int ir = int(255.99*col.x());
+            int ig = int(255.99*col.y());
+            int ib = int(255.99*col.z());
             image[index++] = ir;
             image[index++] = ig;
             image[index++] = ib;
         }
     }
+    std::clock_t end = std::clock();
+    std::cout << "CPU time: " << 1000.0 * (end - start) / CLOCKS_PER_SEC << "ms" << std::endl;
     stbi_write_jpg("render.jpg", nx, ny, 3, image, 100);
+	return 0;
 }
