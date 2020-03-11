@@ -73,11 +73,15 @@ int main(int argc, char **argv) {
     if (rank == 0)
         start_time = std::clock();
 
-    int nx = 1000;
-    int ny = 500;
+    int nx = 4000;
+    int ny = 2000;
     int ns = 10;
     std::vector<unsigned char> image;
-    image.reserve(nx * ny * 3 / size); // RGB image for each process
+
+    if (rank != 0)
+        image.reserve(nx * ny * 3 / size); // RGB image for each process
+    else
+        image.reserve(nx * ny * 3);
 
     Vec3 lookfrom(13, 2, 3);
     Vec3 lookat(0, 0, 0);
@@ -89,13 +93,13 @@ int main(int argc, char **argv) {
     list[2] = new Sphere(Vec3(1, 0, -1), 0.5, new Metal(Vec3(0.8, 0.6, 0.2), 0.5));
     list[3] = new Sphere(Vec3(-1, 0, -1), 0.5, new Metal(Vec3(0.8, 0.8, 0.8), 0.5));
     Hittable *world = new HittableList(list, 4);
-    world = random_scene();
+    //world = random_scene();
 
     Camera cam(lookfrom, lookat, Vec3(0, 1, 0), 20, float(nx) / float(ny));
 
     // calculate start and stop point for each rank
     int start = (ny) - ((int((ny) / size)) * rank) - 1;
-    int stop = (ny - 1) - ((int((ny - 1) / size)) * (rank+1));
+    int stop = (ny) - ((int((ny) / size)) * (rank+1));
 
     // to compensate for the int division, the last rank might has to do some more
     if (rank == size - 1)
@@ -128,14 +132,26 @@ int main(int argc, char **argv) {
         MPI_Send(image.data(), image_size, MPI_UNSIGNED_CHAR, 0, 1, MPI_COMM_WORLD);
     }
     else if (rank == 0) {
+        std::vector<int> processed_pixels;
         for (int i = 1; i < size; i++) {
             int image_size;
             MPI_Recv(&image_size, 1, MPI_INT, i, MPI_ANY_TAG, MPI_COMM_WORLD, nullptr);
+            processed_pixels.push_back(image_size);
             unsigned char buf[image_size];
             MPI_Recv(&buf, image_size, MPI_UNSIGNED_CHAR, i, MPI_ANY_TAG, MPI_COMM_WORLD, nullptr);
-            std::vector<unsigned char> v(buf, buf + sizeof buf / sizeof buf[0]);
-            image.insert(image.end(), v.begin(), v.end());
+            image.insert(image.end(), buf, buf + image_size);
         }
+
+        // make sure we didn't miss a pixel
+        assert(image.size() == nx * ny * 3);
+
+        int avg_pixels;
+        for (const int &i : processed_pixels) {
+           avg_pixels += i/3; 
+        }
+        avg_pixels /= size;
+        std::cout << "Each process processed ~" << avg_pixels << " pixels" <<  std::endl;
+
         std::clock_t end = std::clock();
         std::cout << "CPU time: " << 1000.0 * (end - start) / CLOCKS_PER_SEC << "ms" << std::endl;
         stbi_write_jpg("render.jpg", nx, ny, 3, image.data(), 100);
