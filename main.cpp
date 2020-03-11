@@ -6,6 +6,8 @@
 #include <cfloat>
 #include "Camera.h"
 #include "Material.h"
+#include <mpi.h>
+#include <ctime>
 
 Vec3 color(const Ray& r, Hittable *world, int depth) {
     hit_record rec;
@@ -59,12 +61,24 @@ Hittable *random_scene() {
     return new HittableList(list,i);
 }
 
-int main() {
+int main(int argc, char **argv) {
+    int rank, size;
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    std::clock_t start_time;
+
+    if (rank == 0)
+        start_time = std::clock();
+
     int nx = 1000;
     int ny = 500;
     int ns = 10;
-    unsigned char image[nx * ny * 3]; // RGB image
-    int index = 0;
+    std::vector<unsigned char> image;
+    image.reserve(nx * ny * 3 / size); // RGB image for each process
+
     Vec3 lookfrom(13, 2, 3);
     Vec3 lookat(0, 0, 0);
 
@@ -79,8 +93,16 @@ int main() {
 
     Camera cam(lookfrom, lookat, Vec3(0, 1, 0), 20, float(nx) / float(ny));
 
+    // calculate start and stop point for each rank
+    int start = (ny) - ((int((ny) / size)) * rank) - 1;
+    int stop = (ny - 1) - ((int((ny - 1) / size)) * (rank+1));
+
+    // to compensate for the int division, the last rank might has to do some more
+    if (rank == size - 1)
+        stop = 0;
+
     // going from left top to right bottom (row by row)
-    for (int j = ny-1; j >= 0; j--) {
+    for (int j = start; j >= stop; j--) {
         for (int i = 0; i < nx; i++) {
             Vec3 col(0, 0, 0);
             for (int s = 0; s < ns; s++) {
@@ -91,14 +113,34 @@ int main() {
             }
             col /= float(ns);
             col = Vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
-
             int ir = int(255.99*col[0]);
             int ig = int(255.99*col[1]);
             int ib = int(255.99*col[2]);
-            image[index++] = ir;
-            image[index++] = ig;
-            image[index++] = ib;
+            image.push_back(ir);
+            image.push_back(ig);
+            image.push_back(ib);
         }
     }
-    stbi_write_jpg("render.jpg", nx, ny, 3, image, 100);
+
+    if (rank != 0) {
+        int image_size = image.size();
+        MPI_Send(&image_size, 1, MPI_INT, 0, 1, MPI_COMM_WORLD);
+        MPI_Send(image.data(), image_size, MPI_UNSIGNED_CHAR, 0, 1, MPI_COMM_WORLD);
+    }
+    else if (rank == 0) {
+        for (int i = 1; i < size; i++) {
+            int image_size;
+            MPI_Recv(&image_size, 1, MPI_INT, i, MPI_ANY_TAG, MPI_COMM_WORLD, nullptr);
+            unsigned char buf[image_size];
+            MPI_Recv(&buf, image_size, MPI_UNSIGNED_CHAR, i, MPI_ANY_TAG, MPI_COMM_WORLD, nullptr);
+            std::vector<unsigned char> v(buf, buf + sizeof buf / sizeof buf[0]);
+            image.insert(image.end(), v.begin(), v.end());
+        }
+        std::clock_t end = std::clock();
+        std::cout << "CPU time: " << 1000.0 * (end - start) / CLOCKS_PER_SEC << "ms" << std::endl;
+        stbi_write_jpg("render.jpg", nx, ny, 3, image.data(), 100);
+    }
+
+    MPI_Finalize();
+    return 0;
 }
