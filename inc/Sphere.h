@@ -6,7 +6,7 @@
 class Sphere : public Hittable {
 public:
 	Sphere() {};
-	Sphere(Vec3 cen, float r, Material *m) : center(cen), radius(r), mat_ptr(m) {};
+	Sphere(Vec3 cen, float r, Material *m, int material_type) : center(cen), radius(r), mat_ptr(m), mat_type(material_type) {};
 	virtual bool hit (const Ray& r, float t_min, float t_max, hit_record& rec) const {
 		Vec3 oc = r.origin() - center;
     	float a = dot(r.direction(), r.direction());
@@ -36,6 +36,7 @@ public:
 	Vec3 center;
 	float radius;
     Material *mat_ptr;
+    int mat_type;
 };
 
 #endif

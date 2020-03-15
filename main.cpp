@@ -8,6 +8,7 @@
 #include "Material.h"
 #include <mpi.h>
 #include <ctime>
+#include <fstream>
 
 Vec3 color(const Ray& r, Hittable *world, int depth) {
     hit_record rec;
@@ -26,10 +27,61 @@ Vec3 color(const Ray& r, Hittable *world, int depth) {
     }
 }
 
-Hittable *random_scene() {
+Hittable* share_scene(HittableList *world, int &rank) {
+    int list_size;
+    if (rank == 0)
+        list_size = world->list_size;
+    MPI_Bcast(&list_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    Hittable **list = new Hittable*[list_size]; 
+    for (int i = 0; i < list_size; i++) {
+        float data[8];
+        if (rank == 0) {
+            Sphere *sph = static_cast<Sphere*>(world->list[i]);
+            data[0] = sph->center.x();
+            data[1] = sph->center.y();
+            data[2] = sph->center.z();
+            data[3] = sph->radius;
+            data[4] = 0;
+            data[5] = 0;
+            data[6] = 0;
+            data[7] = -1;
+            if (sph->mat_type == 0) {
+                Lambertian *lamb = static_cast<Lambertian*>(sph->mat_ptr);
+                data[4] = lamb->albedo.r();
+                data[5] = lamb->albedo.g();
+                data[6] = lamb->albedo.b();
+            } else if (sph->mat_type == 1) {
+                Metal *met = static_cast<Metal*>(sph->mat_ptr);
+                data[4] = met->albedo.r();
+                data[5] = met->albedo.g();
+                data[6] = met->albedo.b();
+                data[7] = met->fuzz;
+            }
+        }
+
+        MPI_Bcast(&data, 8, MPI_FLOAT, 0, MPI_COMM_WORLD);
+
+        if (rank != 0) {
+            Vec3 center(data[0], data[1], data[2]);
+            float radius = data[3];
+            Vec3 albedo(data[4], data[5], data[6]);
+            if (data[7] >= 0) {
+                list[i] = new Sphere(center, radius, new Metal(albedo, data[7]), 1);
+            } else {
+                list[i] = new Sphere(center, radius, new Lambertian(albedo), 0);
+            } 
+        }
+    }
+    if (rank == 0)
+        return world;
+    else
+        return new HittableList(list, list_size);
+}
+
+HittableList* random_scene() {
     int n = 500;
     Hittable **list = new Hittable*[n+1];
-    list[0] =  new Sphere(Vec3(0,-1000,0), 1000, new Lambertian(Vec3(0.5, 0.5, 0.5)));
+    list[0] =  new Sphere(Vec3(0,-1000,0), 1000, new Lambertian(Vec3(0.5, 0.5, 0.5)), 0);
     int i = 1;
     for (int a = -11; a < 11; a++) {
         for (int b = -11; b < 11; b++) {
@@ -40,25 +92,23 @@ Hittable *random_scene() {
                     list[i++] = new Sphere(center, 0.2,
                         new Lambertian(Vec3(random_float()*random_float(),
                                             random_float()*random_float(),
-                                            random_float()*random_float())
-                        )
-                    );
+                                            random_float()*random_float())),0);
                 }
                 else if (choose_mat < 0.95) { // Metal
                     list[i++] = new Sphere(center, 0.2,
                             new Metal(Vec3(0.5*(1 + random_float()),
                                            0.5*(1 + random_float()),
                                            0.5*(1 + random_float())),
-                                           0.5*random_float()));
+                                           0.5*random_float()), 1);
                 }
             }
         }
     }
 
-    list[i++] = new Sphere(Vec3(4, 1, 0), 1.0, new Metal(Vec3(0.7, 0.6, 0.5), 0.0));
-    list[i++] = new Sphere(Vec3(-4, 1, 0), 1.0, new Lambertian(Vec3(0.4, 0.2, 0.1)));
+    list[i++] = new Sphere(Vec3(4, 1, 0), 1.0, new Metal(Vec3(0.7, 0.6, 0.5), 0.0), 1);
+    list[i++] = new Sphere(Vec3(-4, 1, 0), 1.0, new Lambertian(Vec3(0.4, 0.2, 0.1)), 0);
 
-    return new HittableList(list,i);
+    return new HittableList(list, i);
 }
 
 int main(int argc, char **argv) {
@@ -73,8 +123,8 @@ int main(int argc, char **argv) {
     if (rank == 0)
         start_time = std::clock();
 
-    int nx = 4000;
-    int ny = 2000;
+    int nx = 2000;
+    int ny = 1000;
     int ns = 10;
     std::vector<unsigned char> image;
 
@@ -86,14 +136,16 @@ int main(int argc, char **argv) {
     Vec3 lookfrom(13, 2, 3);
     Vec3 lookat(0, 0, 0);
 
-    // setup scene
-    Hittable *list[4];
-    list[0] = new Sphere(Vec3(0, 0, -1), 0.5, new Lambertian(Vec3(0.8, 0.3, 0.3)));
-    list[1] = new Sphere(Vec3(0, -100.5, -1), 100, new Lambertian(Vec3(0.8, 0.8, 0.0)));
-    list[2] = new Sphere(Vec3(1, 0, -1), 0.5, new Metal(Vec3(0.8, 0.6, 0.2), 0.5));
-    list[3] = new Sphere(Vec3(-1, 0, -1), 0.5, new Metal(Vec3(0.8, 0.8, 0.8), 0.5));
-    Hittable *world = new HittableList(list, 4);
-    //world = random_scene();
+    HittableList *world_list;
+
+    if (rank == 0) {
+        // setup scene
+        world_list = random_scene();
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    Hittable* world = share_scene(world_list, rank);
 
     Camera cam(lookfrom, lookat, Vec3(0, 1, 0), 20, float(nx) / float(ny));
 
