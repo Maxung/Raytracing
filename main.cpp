@@ -10,6 +10,16 @@
 #include <ctime>
 #include <fstream>
 
+// aligned 2D array for MPI
+float **alloc_2d_float(int rows, int cols) {
+    float *data = (float*)malloc(rows * cols * sizeof(float));
+    float **array = (float**)malloc(rows * sizeof(float*));
+    for (int i = 0; i < rows; i++)
+        array[i] = &(data[cols * i]);
+
+    return array;
+}
+
 Vec3 color(const Ray& r, Hittable *world, int depth) {
     hit_record rec;
     if (world->hit(r, 0.001, FLT_MAX, rec)) { // color hit Sphere
@@ -27,51 +37,58 @@ Vec3 color(const Ray& r, Hittable *world, int depth) {
     }
 }
 
+// process 0 generates the random scene and sends it to all other processes
 Hittable* share_scene(HittableList *world, int &rank) {
     int list_size;
     if (rank == 0)
         list_size = world->list_size;
     MPI_Bcast(&list_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
     Hittable **list = new Hittable*[list_size]; 
+    float **scene_data = alloc_2d_float(list_size, 8);
     for (int i = 0; i < list_size; i++) {
-        float data[8];
         if (rank == 0) {
             Sphere *sph = static_cast<Sphere*>(world->list[i]);
-            data[0] = sph->center.x();
-            data[1] = sph->center.y();
-            data[2] = sph->center.z();
-            data[3] = sph->radius;
-            data[4] = 0;
-            data[5] = 0;
-            data[6] = 0;
-            data[7] = -1;
+            scene_data[i][0] = sph->center.x();
+            scene_data[i][1] = sph->center.y();
+            scene_data[i][2] = sph->center.z();
+            scene_data[i][3] = sph->radius;
+            scene_data[i][4] = 0;
+            scene_data[i][5] = 0;
+            scene_data[i][6] = 0;
+            scene_data[i][7] = -1;
             if (sph->mat_type == 0) {
                 Lambertian *lamb = static_cast<Lambertian*>(sph->mat_ptr);
-                data[4] = lamb->albedo.r();
-                data[5] = lamb->albedo.g();
-                data[6] = lamb->albedo.b();
+                scene_data[i][4] = lamb->albedo.r();
+                scene_data[i][5] = lamb->albedo.g();
+                scene_data[i][6] = lamb->albedo.b();
             } else if (sph->mat_type == 1) {
                 Metal *met = static_cast<Metal*>(sph->mat_ptr);
-                data[4] = met->albedo.r();
-                data[5] = met->albedo.g();
-                data[6] = met->albedo.b();
-                data[7] = met->fuzz;
+                scene_data[i][4] = met->albedo.r();
+                scene_data[i][5] = met->albedo.g();
+                scene_data[i][6] = met->albedo.b();
+                scene_data[i][7] = met->fuzz;
             }
         }
+    }
 
-        MPI_Bcast(&data, 8, MPI_FLOAT, 0, MPI_COMM_WORLD);
-
+    MPI_Bcast(&(scene_data[0][0]), list_size * 8, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    
+    for (int i = 0; i < list_size; i++) {
         if (rank != 0) {
-            Vec3 center(data[0], data[1], data[2]);
-            float radius = data[3];
-            Vec3 albedo(data[4], data[5], data[6]);
-            if (data[7] >= 0) {
-                list[i] = new Sphere(center, radius, new Metal(albedo, data[7]), 1);
+            Vec3 center(scene_data[i][0], scene_data[i][1], scene_data[i][2]);
+            float radius = scene_data[i][3];
+            Vec3 albedo(scene_data[i][4], scene_data[i][5], scene_data[i][6]);
+            if (scene_data[i][7] >= 0) {
+                list[i] = new Sphere(center, radius, new Metal(albedo, scene_data[i][7]), 1);
             } else {
                 list[i] = new Sphere(center, radius, new Lambertian(albedo), 0);
             } 
         }
     }
+
+    free(scene_data[0]);
+    free(scene_data);
+
     if (rank == 0)
         return world;
     else
