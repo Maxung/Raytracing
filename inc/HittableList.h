@@ -5,9 +5,9 @@
 
 class HittableList : public Hittable {
 public:
-	HittableList() {};
-	HittableList(Hittable **l, int n) { list = l; list_size = n; };
-	virtual bool hit(const Ray& r, float t_min, float t_max, hit_record& rec) const {
+	__device__ HittableList() {};
+	__device__ HittableList(Hittable **l, int n) { list = l; list_size = n; };
+	__device__ virtual bool hit(const Ray& r, float t_min, float t_max, hit_record& rec) const {
 		hit_record temp_rec;
 		bool hit_anything = false;
 		double closest_so_far = t_max;

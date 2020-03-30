@@ -5,9 +5,9 @@
 
 class Sphere : public Hittable {
 public:
-	Sphere() {};
-	Sphere(Vec3 cen, float r, Material *m) : center(cen), radius(r), mat_ptr(m) {};
-	virtual bool hit (const Ray& r, float t_min, float t_max, hit_record& rec) const {
+	__device__ Sphere() {};
+	__device__ Sphere(Vec3 cen, float r, Material *m) : center(cen), radius(r), mat_ptr(m) {};
+	__device__ virtual bool hit (const Ray& r, float t_min, float t_max, hit_record& rec) const {
 		Vec3 oc = r.origin() - center;
     	float a = dot(r.direction(), r.direction());
     	float b = dot(oc, r.direction());
