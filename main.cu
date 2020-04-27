@@ -138,8 +138,8 @@ int main() {
     Camera **camera;
     std::clock_t start = std::clock();
 	
-    int tx = 8;
-    int ty = 8;
+    int tx = 16;
+    int ty = 16;
     dim3 blocks(nx / tx + 1, ny / ty + 1);
     dim3 threads(tx, ty);
     curandState *rand_state;
