@@ -164,6 +164,8 @@ int main() {
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
 
+    std::cout << "Launching render with " << blocks.x << "x" << blocks.y << " blocks with " << tx << "x" << ty << " threads" << std::endl;
+
     render<<<blocks, threads>>>(fb, nx, ny, rand_state, camera, ns, world);
     checkCudaErrors(cudaGetLastError());
     checkCudaErrors(cudaDeviceSynchronize());
