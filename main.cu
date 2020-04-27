@@ -56,29 +56,29 @@ __global__ void random_scene(Hittable **list,  Hittable **world, Camera **camera
         for (int a = -11; a < 11; a++) {
             for (int b = -11; b < 11; b++) {
                 float choose_mat = curand_uniform(&lrs);
-                Vec3 center(a+0.9*curand_uniform(&lrs),0.2,b+0.9*curand_uniform(&lrs));
-                if ((center-Vec3(4,0.2,0)).length() > 0.9) {
-                    if (choose_mat < 0.8) {  // diffuse
-                        list[i++] = new Sphere(center, 0.2,
+                Vec3 center(a+0.9f*curand_uniform(&lrs),0.2f,b+0.9f*curand_uniform(&lrs));
+                if ((center-Vec3(4,0.2f,0)).length() > 0.9f) {
+                    if (choose_mat < 0.8f) {  // diffuse
+                        list[i++] = new Sphere(center, 0.2f,
                             new Lambertian(Vec3(curand_uniform(&lrs)*curand_uniform(&lrs),
                                             curand_uniform(&lrs)*curand_uniform(&lrs),
                                             curand_uniform(&lrs)*curand_uniform(&lrs))
                             )
                         );
                     }
-                    else if (choose_mat < 0.95) { // Metal
-                        list[i++] = new Sphere(center, 0.2,
-                                new Metal(Vec3(0.5*(1 + curand_uniform(&lrs)),
-                                           0.5*(1 + curand_uniform(&lrs)),
-                                           0.5*(1 + curand_uniform(&lrs))),
-                                           0.5*curand_uniform(&lrs)));
+                    else if (choose_mat < 0.95f) { // Metal
+                        list[i++] = new Sphere(center, 0.2f,
+                                new Metal(Vec3(0.5f*(1 + curand_uniform(&lrs)),
+                                           0.5f*(1 + curand_uniform(&lrs)),
+                                           0.5f*(1 + curand_uniform(&lrs))),
+                                           0.5f*curand_uniform(&lrs)));
                     }
                 }
             }
         }
 
-        list[i++] = new Sphere(Vec3(4, 1, 0), 1.0, new Metal(Vec3(0.7, 0.6, 0.5), 0.0));
-        list[i++] = new Sphere(Vec3(-4, 1, 0), 1.0, new Lambertian(Vec3(0.4, 0.2, 0.1)));
+        list[i++] = new Sphere(Vec3(4, 1, 0), 1.0f, new Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0f));
+        list[i++] = new Sphere(Vec3(-4, 1, 0), 1.0f, new Lambertian(Vec3(0.4f, 0.2f, 0.1f)));
 
         *world = new HittableList(list,i);
         *camera = new Camera(Vec3(13, 2, 3), Vec3(0, 0, 0), Vec3(0, 1, 0), 20, float(nx) / float(ny));
@@ -182,7 +182,7 @@ int main() {
     }
 	
     std::clock_t end = std::clock();
-    std::cout << "CPU time: " << 1000.0 * (end - start) / CLOCKS_PER_SEC << "ms" << std::endl;    
+    std::cout << "GPU time: " << 1000.0 * (end - start) / CLOCKS_PER_SEC << "ms" << std::endl;    
 
     stbi_write_jpg("render.jpg", nx, ny, 3, image, 100);
 
