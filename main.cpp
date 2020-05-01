@@ -140,8 +140,8 @@ int main(int argc, char **argv) {
     if (rank == 0)
         start_time = std::clock();
 
-    int nx = 2000;
-    int ny = 1000;
+    int nx = 1000;
+    int ny = 500;
     int ns = 10;
     std::vector<unsigned char> image;
 
