@@ -4,6 +4,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #include <cfloat>
+#include <ctime>
 #include "Camera.h"
 #include "Material.h"
 
@@ -68,14 +69,10 @@ int main() {
     Vec3 lookfrom(13, 2, 3);
     Vec3 lookat(0, 0, 0);
 
+    std::clock_t start = std::clock();
+
     // setup scene
-    Hittable *list[4];
-    list[0] = new Sphere(Vec3(0, 0, -1), 0.5, new Lambertian(Vec3(0.8, 0.3, 0.3)));
-    list[1] = new Sphere(Vec3(0, -100.5, -1), 100, new Lambertian(Vec3(0.8, 0.8, 0.0)));
-    list[2] = new Sphere(Vec3(1, 0, -1), 0.5, new Metal(Vec3(0.8, 0.6, 0.2), 0.5));
-    list[3] = new Sphere(Vec3(-1, 0, -1), 0.5, new Metal(Vec3(0.8, 0.8, 0.8), 0.5));
-    Hittable *world = new HittableList(list, 4);
-    world = random_scene();
+    Hittable *world = random_scene();
 
     Camera cam(lookfrom, lookat, Vec3(0, 1, 0), 20, float(nx) / float(ny));
 
@@ -100,5 +97,9 @@ int main() {
             image[index++] = ib;
         }
     }
+
+    std::clock_t end = std::clock();
+    std::cout << "CPU time: " << 1000.0 * (end - start) / CLOCKS_PER_SEC << "ms" << std::endl;
+
     stbi_write_jpg("render.jpg", nx, ny, 3, image, 100);
 }
