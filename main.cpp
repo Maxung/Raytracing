@@ -60,7 +60,6 @@ Hittable *random_scene() {
 }
 
 int main() {
-    std::clock_t start = std::clock();
     const int nx = 1000;
     const int ny = 500;
     const int ns = 10;
@@ -68,6 +67,8 @@ int main() {
 	int index = 0;
     Vec3 lookfrom(13, 2, 3);
     Vec3 lookat(0, 0, 0);
+
+    std::clock_t start = std::clock();
 
     // setup scene
     Hittable *list[4];
@@ -104,5 +105,5 @@ int main() {
     std::clock_t end = std::clock();
     std::cout << "CPU time: " << 1000.0 * (end - start) / CLOCKS_PER_SEC << "ms" << std::endl;
     stbi_write_jpg("render.jpg", nx, ny, 3, image, 100);
-	return 0;
+    return 0;
 }
