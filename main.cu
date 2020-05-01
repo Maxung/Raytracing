@@ -128,8 +128,8 @@ __global__ void cleanup(Hittable **list, Hittable **world,  Camera **camera) {
 }
 
 int main() {
-    const int nx = 2000;
-    const int ny = 1000;
+    const int nx = 1000;
+    const int ny = 500;
     int ns = 10;
     unsigned char image[nx * ny * 3]; // RGB image
     Vec3 *fb;
